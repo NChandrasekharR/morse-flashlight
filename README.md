@@ -21,7 +21,7 @@ A simple web app that converts text to morse code and flashes your phone screen 
 
 ## Live Demo
 
-Access the app at: https://chandraramanujan.github.io/morse-flashlight
+Access the app at: (https://nchandrasekharr.github.io/morse-flashlight/)
 
 ## Morse Code Reference
 

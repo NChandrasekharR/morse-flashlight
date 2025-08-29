@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morse Code Flashlight</title>
+    <style>
+        /* CSS EXPLANATION:
+           - We're setting up a full-screen app that works well on phones
+           - The body will change colors when flashing
+           - Dark theme by default for battery saving */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: background-color 0.1s ease;
+        }
+        
+        /* This class will be toggled to create the flash effect */
+        body.flash {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background-color: #2a2a2a;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            background-color: #007AFF;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #FF3B30;
+        }
+        
+        button.sos {
+            background-color: #FF9500;
+        }
+        
+        .speed-control {
+            margin: 20px 0;
+        }
+        
+        .speed-control label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #888;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #444;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #007AFF;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .morse-display {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            min-height: 50px;
+            font-family: monospace;
+            font-size: 18px;
+            letter-spacing: 3px;
+        }
+        
+        .info {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Morse Code Flashlight</h1>
+        
+        <div class="input-group">
+            <input type="text" id="messageInput" placeholder="Type your message here..." value="HELP">
+        </div>
+        
+        <div class="controls">
+            <button id="flashBtn" onclick="startFlashing()">Flash Message</button>
+            <button id="stopBtn" class="stop" onclick="stopFlashing()" disabled>Stop</button>
+        </div>
+        
+        <button id="sosBtn" class="sos" onclick="flashSOS()">🆘 SOS</button>
+        
+        <div class="speed-control">
+            <label for="speedSlider">Speed: <span id="speedValue">Medium</span></label>
+            <input type="range" id="speedSlider" min="50" max="300" value="150" onchange="updateSpeed()">
+        </div>
+        
+        <div class="morse-display" id="morseDisplay">
+            <!-- Morse code pattern will appear here -->
+        </div>
+        
+        <div class="info">
+            • = dot (short flash)<br>
+            — = dash (long flash)<br>
+            Tip: Keep phone screen at max brightness
+        </div>
+    </div>
+
+    <script>
+        // JAVASCRIPT EXPLANATION:
+        // I'll walk you through each part of the code as we build it
+        
+        // Step 1: MORSE CODE DICTIONARY
+        // This maps each letter and number to its morse code pattern
+        // '.' represents a dot (short flash)
+        // '-' represents a dash (long flash, 3x longer than dot)
+        const morseCode = {
+            'A': '.-',    'B': '-...',  'C': '-.-.',  'D': '-..',
+            'E': '.',     'F': '..-.',  'G': '--.',   'H': '....',
+            'I': '..',    'J': '.---',  'K': '-.-',   'L': '.-..',
+            'M': '--',    'N': '-.',    'O': '---',   'P': '.--.',
+            'Q': '--.-',  'R': '.-.',   'S': '...',   'T': '-',
+            'U': '..-',   'V': '...-',  'W': '.--',   'X': '-..-',
+            'Y': '-.--',  'Z': '--..',
+            '0': '-----', '1': '.----', '2': '..---', '3': '...--',
+            '4': '....-', '5': '.....', '6': '-....', '7': '--...',
+            '8': '---..', '9': '----.',
+            ' ': '/', // Space between words
+        };
+        
+        // Step 2: TIMING VARIABLES
+        // These control how long each element lasts
+        let unitTime = 150; // Base time unit in milliseconds
+        let isFlashing = false; // Track if we're currently flashing
+        let flashTimeout; // Store timeout so we can cancel it
+        
+        // Step 3: CONVERT TEXT TO MORSE PATTERN
+        // This function takes your text and converts it to dots and dashes
+        function textToMorse(text) {
+            // Convert to uppercase since our dictionary uses uppercase
+            text = text.toUpperCase();
+            let morsePattern = [];
+            
+            // Go through each character in the text
+            for (let char of text) {
+                if (morseCode[char]) {
+                    // If we have a morse code for this character, add it
+                    morsePattern.push(morseCode[char]);
+                }
+            }
+            
+            // Join all patterns with spaces between letters
+            return morsePattern.join(' ');
+        }
+        
+        // Step 4: FLASH THE SCREEN
+        // This is the core function that creates the flashing effect
+        async function flashMorse(pattern) {
+            // Split the pattern into individual symbols
+            const symbols = pattern.replace(/ /g, '').split('');
+            
+            for (let i = 0; i < symbols.length; i++) {
+                // Check if user clicked stop
+                if (!isFlashing) break;
+                
+                const symbol = symbols[i];
+                
+                if (symbol === '.') {
+                    // DOT: Short flash (1 unit)
+                    await flash(unitTime);
+                } else if (symbol === '-') {
+                    // DASH: Long flash (3 units)
+                    await flash(unitTime * 3);
+                } else if (symbol === '/') {
+                    // SPACE between words (7 units total)
+                    await wait(unitTime * 7);
+                    continue;
+                }
+                
+                // Gap between dots/dashes within a letter (1 unit)
+                if (i < symbols.length - 1 && symbols[i + 1] !== '/') {
+                    await wait(unitTime);
+                }
+                
+                // Gap between letters (3 units)
+                // We detect this by checking if next char is a space in original pattern
+                if (pattern[pattern.indexOf(symbol, i) + 1] === ' ') {
+                    await wait(unitTime * 2); // 2 more units (we already waited 1)
+                }
+            }
+            
+            // Flashing complete, reset buttons
+            if (isFlashing) {
+                stopFlashing();
+            }
+        }
+        
+        // Step 5: HELPER FUNCTIONS FOR TIMING
+        // These create the actual flash and wait periods
+        
+        // Flash the screen for a specified duration
+        function flash(duration) {
+            return new Promise(resolve => {
+                // Add the flash class to make screen white
+                document.body.classList.add('flash');
+                
+                flashTimeout = setTimeout(() => {
+                    // Remove flash class to go back to dark
+                    document.body.classList.remove('flash');
+                    resolve();
+                }, duration);
+            });
+        }
+        
+        // Wait without flashing (for gaps between flashes)
+        function wait(duration) {
+            return new Promise(resolve => {
+                flashTimeout = setTimeout(resolve, duration);
+            });
+        }
+        
+        // Step 6: CONTROL FUNCTIONS
+        // These handle button clicks and user interactions
+        
+        function startFlashing() {
+            const message = document.getElementById('messageInput').value;
+            
+            if (!message) {
+                alert('Please enter a message to flash');
+                return;
+            }
+            
+            // Convert message to morse code
+            const morsePattern = textToMorse(message);
+            
+            // Display the morse pattern
+            document.getElementById('morseDisplay').textContent = morsePattern;
+            
+            // Update button states
+            isFlashing = true;
+            document.getElementById('flashBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('sosBtn').disabled = true;
+            
+            // Start flashing
+            flashMorse(morsePattern);
+        }
+        
+        function stopFlashing() {
+            isFlashing = false;
+            
+            // Clear any pending timeout
+            if (flashTimeout) {
+                clearTimeout(flashTimeout);
+            }
+            
+            // Make sure flash is off
+            document.body.classList.remove('flash');
+            
+            // Reset buttons
+            document.getElementById('flashBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('sosBtn').disabled = false;
+        }
+        
+        function flashSOS() {
+            // Set input to SOS and flash it
+            document.getElementById('messageInput').value = 'SOS';
+            startFlashing();
+        }
+        
+        function updateSpeed() {
+            const slider = document.getElementById('speedSlider');
+            const speedValue = document.getElementById('speedValue');
+            
+            // Inverse relationship: lower slider value = faster speed
+            unitTime = parseInt(slider.value);
+            
+            // Update label
+            if (unitTime < 100) {
+                speedValue.textContent = 'Fast';
+            } else if (unitTime < 200) {
+                speedValue.textContent = 'Medium';
+            } else {
+                speedValue.textContent = 'Slow';
+            }
+        }
+        
+        // Step 7: INITIALIZATION
+        // Show the morse pattern for the default message when page loads
+        window.onload = function() {
+            const defaultMessage = document.getElementById('messageInput').value;
+            if (defaultMessage) {
+                document.getElementById('morseDisplay').textContent = textToMorse(defaultMessage);
+            }
+        };
+        
+        // Allow Enter key to start flashing
+        document.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter' && !isFlashing) {
+                startFlashing();
+            }
+        });
+    </script>
+</body>
+</html>

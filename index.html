@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Morse Code Flashlight</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: background-color 0.05s ease;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body.flash {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background-color: #2a2a2a;
+            color: #ffffff;
+            margin-bottom: 10px;
+            -webkit-appearance: none;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #007AFF;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            background-color: #007AFF;
+            color: white;
+            cursor: pointer;
+            -webkit-appearance: none;
+            touch-action: manipulation;
+        }
+        
+        button:active {
+            opacity: 0.8;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        button.stop {
+            background-color: #FF3B30;
+        }
+        
+        button.sos {
+            background-color: #FF9500;
+        }
+        
+        .speed-control {
+            margin: 20px 0;
+        }
+        
+        .speed-control label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #888;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #444;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #007AFF;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        .morse-display {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            min-height: 50px;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            letter-spacing: 3px;
+            word-break: break-all;
+        }
+        
+        .info {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .debug {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #2a2a2a;
+            border-radius: 5px;
+            font-size: 11px;
+            color: #888;
+            display: none;
+        }
+        
+        .debug.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Morse Code Flashlight</h1>
+        
+        <div class="input-group">
+            <input type="text" id="messageInput" placeholder="Type your message here..." value="SOS">
+        </div>
+        
+        <div class="controls">
+            <button id="flashBtn">Flash Message</button>
+            <button id="stopBtn" class="stop" disabled>Stop</button>
+        </div>
+        
+        <button id="sosBtn" class="sos">🆘 Quick SOS</button>
+        
+        <div class="speed-control">
+            <label for="speedSlider">Speed: <span id="speedValue">Medium</span></label>
+            <input type="range" id="speedSlider" min="50" max="300" value="150">
+        </div>
+        
+        <div class="morse-display" id="morseDisplay">
+            ... --- ...
+        </div>
+        
+        <div class="info">
+            • = dot (short flash)<br>
+            — = dash (long flash)<br>
+            Tip: Keep screen at max brightness
+        </div>
+        
+        <div class="debug" id="debug"></div>
+    </div>
+
+    <script>
+        // Debug function for iOS
+        function log(message) {
+            console.log(message);
+            const debugEl = document.getElementById('debug');
+            if (debugEl) {
+                debugEl.classList.add('show');
+                debugEl.innerHTML = message + '<br>' + debugEl.innerHTML;
+            }
+        }
+        
+        // Morse code dictionary
+        const morseCode = {
+            'A': '.-',    'B': '-...',  'C': '-.-.',  'D': '-..',
+            'E': '.',     'F': '..-.',  'G': '--.',   'H': '....',
+            'I': '..',    'J': '.---',  'K': '-.-',   'L': '.-..',
+            'M': '--',    'N': '-.',    'O': '---',   'P': '.--.',
+            'Q': '--.-',  'R': '.-.',   'S': '...',   'T': '-',
+            'U': '..-',   'V': '...-',  'W': '.--',   'X': '-..-',
+            'Y': '-.--',  'Z': '--..',
+            '0': '-----', '1': '.----', '2': '..---', '3': '...--',
+            '4': '....-', '5': '.....', '6': '-....', '7': '--...',
+            '8': '---..', '9': '----.',
+            ' ': '/'
+        };
+        
+        // Global variables
+        let unitTime = 150;
+        let isFlashing = false;
+        let currentTimeouts = [];
+        
+        // Convert text to morse code
+        function textToMorse(text) {
+            try {
+                text = text.toUpperCase();
+                let result = [];
+                
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    if (morseCode[char]) {
+                        result.push(morseCode[char]);
+                    }
+                }
+                
+                return result.join(' ');
+            } catch (e) {
+                log('Error in textToMorse: ' + e.message);
+                return '';
+            }
+        }
+        
+        // Main flashing function - rewritten for iOS compatibility
+        function startFlashing() {
+            try {
+                const messageInput = document.getElementById('messageInput');
+                const message = messageInput.value;
+                
+                if (!message || message.trim() === '') {
+                    alert('Please enter a message to flash');
+                    return;
+                }
+                
+                log('Starting flash for: ' + message);
+                
+                // Convert to morse
+                const morsePattern = textToMorse(message);
+                
+                if (!morsePattern) {
+                    alert('Could not convert message to morse code');
+                    return;
+                }
+                
+                // Update display
+                const morseDisplay = document.getElementById('morseDisplay');
+                morseDisplay.textContent = morsePattern;
+                
+                // Set flashing state
+                isFlashing = true;
+                
+                // Update buttons
+                document.getElementById('flashBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('sosBtn').disabled = true;
+                
+                // Start the flash sequence
+                const sequence = buildFlashSequence(morsePattern);
+                playSequence(sequence, 0);
+                
+            } catch (e) {
+                log('Error in startFlashing: ' + e.message);
+                stopFlashing();
+            }
+        }
+        
+        // Build a sequence of flash commands
+        function buildFlashSequence(pattern) {
+            const sequence = [];
+            const symbols = pattern.split('');
+            
+            for (let i = 0; i < symbols.length; i++) {
+                const symbol = symbols[i];
+                
+                if (symbol === '.') {
+                    sequence.push({type: 'on', duration: unitTime});
+                    sequence.push({type: 'off', duration: unitTime});
+                } else if (symbol === '-') {
+                    sequence.push({type: 'on', duration: unitTime * 3});
+                    sequence.push({type: 'off', duration: unitTime});
+                } else if (symbol === ' ') {
+                    sequence.push({type: 'off', duration: unitTime * 2});
+                } else if (symbol === '/') {
+                    sequence.push({type: 'off', duration: unitTime * 4});
+                }
+            }
+            
+            return sequence;
+        }
+        
+        // Play the sequence
+        function playSequence(sequence, index) {
+            if (!isFlashing || index >= sequence.length) {
+                stopFlashing();
+                return;
+            }
+            
+            const step = sequence[index];
+            
+            if (step.type === 'on') {
+                document.body.classList.add('flash');
+            } else {
+                document.body.classList.remove('flash');
+            }
+            
+            const timeout = setTimeout(() => {
+                playSequence(sequence, index + 1);
+            }, step.duration);
+            
+            currentTimeouts.push(timeout);
+        }
+        
+        // Stop flashing
+        function stopFlashing() {
+            try {
+                log('Stopping flash');
+                isFlashing = false;
+                
+                // Clear all timeouts
+                currentTimeouts.forEach(t => clearTimeout(t));
+                currentTimeouts = [];
+                
+                // Turn off flash
+                document.body.classList.remove('flash');
+                
+                // Reset buttons
+                document.getElementById('flashBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('sosBtn').disabled = false;
+            } catch (e) {
+                log('Error in stopFlashing: ' + e.message);
+            }
+        }
+        
+        // Flash SOS
+        function flashSOS() {
+            try {
+                document.getElementById('messageInput').value = 'SOS';
+                startFlashing();
+            } catch (e) {
+                log('Error in flashSOS: ' + e.message);
+            }
+        }
+        
+        // Update speed
+        function updateSpeed() {
+            try {
+                const slider = document.getElementById('speedSlider');
+                const speedValue = document.getElementById('speedValue');
+                
+                unitTime = parseInt(slider.value);
+                
+                if (unitTime < 100) {
+                    speedValue.textContent = 'Fast';
+                } else if (unitTime < 200) {
+                    speedValue.textContent = 'Medium';
+                } else {
+                    speedValue.textContent = 'Slow';
+                }
+            } catch (e) {
+                log('Error in updateSpeed: ' + e.message);
+            }
+        }
+        
+        // Initialize when DOM is ready
+        function init() {
+            try {
+                log('Initializing app');
+                
+                // Set up event listeners
+                const flashBtn = document.getElementById('flashBtn');
+                const stopBtn = document.getElementById('stopBtn');
+                const sosBtn = document.getElementById('sosBtn');
+                const speedSlider = document.getElementById('speedSlider');
+                const messageInput = document.getElementById('messageInput');
+                
+                if (flashBtn) {
+                    flashBtn.addEventListener('click', startFlashing);
+                    flashBtn.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        startFlashing();
+                    });
+                }
+                
+                if (stopBtn) {
+                    stopBtn.addEventListener('click', stopFlashing);
+                    stopBtn.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        stopFlashing();
+                    });
+                }
+                
+                if (sosBtn) {
+                    sosBtn.addEventListener('click', flashSOS);
+                    sosBtn.addEventListener('touchend', function(e) {
+                        e.preventDefault();
+                        flashSOS();
+                    });
+                }
+                
+                if (speedSlider) {
+                    speedSlider.addEventListener('input', updateSpeed);
+                    speedSlider.addEventListener('change', updateSpeed);
+                }
+                
+                // Update morse display for default message
+                if (messageInput && messageInput.value) {
+                    const morseDisplay = document.getElementById('morseDisplay');
+                    if (morseDisplay) {
+                        morseDisplay.textContent = textToMorse(messageInput.value);
+                    }
+                }
+                
+                // Update input display as user types
+                if (messageInput) {
+                    messageInput.addEventListener('input', function() {
+                        const morseDisplay = document.getElementById('morseDisplay');
+                        if (morseDisplay) {
+                            const morse = textToMorse(this.value);
+                            morseDisplay.textContent = morse || 'Enter text above';
+                        }
+                    });
+                }
+                
+                log('App initialized successfully');
+                
+            } catch (e) {
+                log('Error in init: ' + e.message);
+            }
+        }
+        
+        // Start app when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
